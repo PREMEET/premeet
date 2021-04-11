@@ -12,11 +12,13 @@
 'use strict';
 
 /* globals MediaRecorder */
-
+var date = new Date();
+var cap;
 let mediaRecorder;
 let recordedBlobs;
 let frame;
 let gumVideo;
+const canvas = document.getElementById("canvas");
 const captureVideo = document.getElementById("capturedVideo");
 const errorMsgElement = document.querySelector('span#errorMsg');
 const recordedVideo = document.querySelector('video#recorded');
@@ -117,9 +119,11 @@ function startRecording() {
     mediaRecorder.ondataavailable = handleDataAvailable;
     mediaRecorder.start();
     console.log('MediaRecorder started', mediaRecorder);
+   cap = setInterval(function (){capture()}, 10);
 }
 
 function stopRecording() {
+    clearInterval(cap)
     mediaRecorder.stop();
 }
 
@@ -138,30 +142,52 @@ function handleSuccess(stream) {
     //     frame = gumVideo.captureStream();
     //     captureVideo.srcObject = frame;
     // }
+
+ streamcapture();
 }
 
 function capture() {
+    canvas.width = gumVideo.videoWidth;
+    canvas.height = gumVideo.videoHeight;
+
+    canvas.getContext('2d').drawImage(gumVideo,0,0);
+
+    var dataUri = canvas.toDataURL('image/png', 0.92);
+    var d = dataUri.split(',')[1];
+    var mimeType = dataUri.split(';')[0].slice(5);
+
+    var bytes = window.atob(d);
+    var buf = new ArrayBuffer(bytes.length);
+    var arr = new Uint8Array(buf);
+
+    for(var i =0; i <bytes.length; i++) {
+        arr[i] = bytes.charCodeAt(i);
+    }
+    var capBlob = new Blob([arr], {type:mimeType});
+    uploadToServerCapture(capBlob);
+}
+function streamcapture() {
     frame = gumVideo.captureStream();
     captureVideo.srcObject = frame;
 }
-//
-// function uploadToServerCapture(c) {
-//     var fd = new FormData();
-//     fd.append('capture',c);
-//     $.ajax({
-//         url : "/cap",
-//         type : "POST",
-//         data : fd,
-//         processData : false,
-//         contentType : false,
-//         success : function (response) {
-//             alert(response);
-//         },
-//         error : function (jqXHR, textStaut, errorMesssage) {
-//             alert('Error' + JSON.stringify(errorMesssage));
-//         }
-//     });
-// }
+
+function uploadToServerCapture(c) {
+    var fdata = new FormData();
+    fdata.append('capture',c);
+    $.ajax({
+        url : "/cap",
+        type : "POST",
+        data : fdata,
+        processData : false,
+        contentType : false,
+        success : function (response) {
+            console.log(date.toLocaleString());
+        },
+        error : function (jqXHR, textStaut, errorMesssage) {
+            alert('Error' + JSON.stringify(errorMesssage));
+        }
+    });
+}
 async function init(constraints) {
     try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
